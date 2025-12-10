@@ -5,7 +5,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { io, Socket } from "socket.io-client";
 import toast from "react-hot-toast";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 /* Cookie-based fetch */
 const fetchWithAuth = async (url: string, options: RequestInit = {}) => {

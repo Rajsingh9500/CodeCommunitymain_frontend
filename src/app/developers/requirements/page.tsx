@@ -10,8 +10,7 @@ export default function DeveloperFeed() {
   const [requirements, setRequirements] = useState<any[]>([]);
   const token = Cookies.get("token") || "";
   const socketRef = useRef<any>(null);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
-
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
   useEffect(() => {
     // fetch existing
     axios

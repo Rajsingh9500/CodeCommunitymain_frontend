@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import toast from "react-hot-toast";
 import { useChatGlobal } from "@/app/providers/ChatProvider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type UserMini = {
   _id: string;

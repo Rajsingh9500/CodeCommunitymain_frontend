@@ -18,7 +18,7 @@ export default function MyRequirements() {
 
   const token = Cookies.get("token") || "";
   const socketRef = useRef<any>(null);
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
   useEffect(() => {
     const rawUser = JSON.parse(Cookies.get("user") || "{}");

@@ -6,7 +6,7 @@ import { ArrowLeft } from "lucide-react";
 import { useChatGlobal } from "@/app/providers/ChatProvider";
 import ChatInboxPage from "../page"; // parent /chat/page
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type UserMini = { _id: string; name?: string; email?: string };
 type MessageType = {

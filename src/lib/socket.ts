@@ -9,7 +9,7 @@ let isConnecting = false;
 export function getSocket(): Socket | null {
   if (typeof window === "undefined") return null;
 
-  const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+  const API = process.env.NEXT_PUBLIC_API_URL;
 
   // If already created, always return same socket instance
   if (socket) return socket;

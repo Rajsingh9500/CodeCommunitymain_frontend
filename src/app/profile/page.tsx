@@ -8,7 +8,7 @@ import Cookies from "js-cookie";
 import toast from "react-hot-toast";
 import { Loader2, Edit, Trash2, LogOut, Save } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 interface UserType {
   id?: string;

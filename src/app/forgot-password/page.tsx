@@ -15,7 +15,7 @@ export default function ForgotPassword() {
   const [resendLoading, setResendLoading] = useState(false);
 
   const API_URL =
-    process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+    process.env.NEXT_PUBLIC_API_URL;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

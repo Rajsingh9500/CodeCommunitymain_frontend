@@ -9,7 +9,7 @@ import toast from "react-hot-toast";
 
 export const AdminSocketContext = createContext<Socket | null>(null);
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();

@@ -13,7 +13,7 @@ export default function ClientPage() {
   const [deadline, setDeadline] = useState("");
 
   const token = Cookies.get("token") || "";
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+  const API_URL = process.env.NEXT_PUBLIC_API_URL;
   const [socket, setSocket] = useState<any>(null);
 
   // ✅ Create socket only once

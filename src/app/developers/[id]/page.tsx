@@ -29,7 +29,7 @@ interface ReviewType {
   comment: string;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 export default function DeveloperIdPage() {
   const { id: devId } = useParams<{ id: string }>();

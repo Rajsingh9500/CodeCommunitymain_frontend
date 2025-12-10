@@ -48,7 +48,7 @@ type AnalyticsState = {
   projectsByStatus?: StatusPoint[];
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 /* ---------- CSV Helper ---------- */
 const toCSV = (rows: any[]) => {
