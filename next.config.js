@@ -24,16 +24,16 @@ const nextConfig = {
   // 🚀 Rewrite API paths to backend IN PRODUCTION
   // ⚠ localhost does NOT work on Vercel
   async rewrites() {
-    return [
-      {
-        source: "/api/:path*",
-        destination:
-          `${process.env.NEXT_PUBLIC_API_URL}/api/:path*`,
-      },
-    ];
-  },
+  const apiUrl =
+    process.env.NEXT_PUBLIC_API_URL ||
+    "https://codecommunitymain-backend.onrender.com";
 
-  productionBrowserSourceMaps: false,
-};
+  return [
+    {
+      source: "/api/:path*",
+      destination: `${apiUrl}/api/:path*`,
+    },
+  ];
+}
 
 module.exports = nextConfig;
