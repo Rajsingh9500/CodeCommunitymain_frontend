@@ -15,12 +15,10 @@
     "incremental": true,
     "forceConsistentCasingInFileNames": true,
 
-    "ignoreDeprecations": "6.0",
-
-    /* 🔥 FIXED */
-    "baseUrl": "src",
+    /* ✅ Fixed alias configuration */
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["*"]
+      "@/*": ["src/*"]
     },
 
     "plugins": [{ "name": "next" }]

@@ -22,19 +22,20 @@ const nextConfig = {
   },
 
   // 🚀 Rewrite API paths to backend IN PRODUCTION
-  // ⚠ localhost does NOT work on Vercel
-async rewrites() {
-  const API_URL =
-    process.env.NEXT_PUBLIC_API_URL ||
-    "https://codecommunitymain-backend.onrender.com";
+  async rewrites() {
+    const API_URL =
+      process.env.NEXT_PUBLIC_API_URL ||
+      "https://codecommunitymain-backend.onrender.com";
 
-  return [
-    {
-      source: "/api/:path*",
-      destination: `${API_URL}/api/:path*`,
-    },
-  ];
-}
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${API_URL}/api/:path*`,
+      },
+    ];
+  },
 
+  productionBrowserSourceMaps: false,
+};
 
 module.exports = nextConfig;
