@@ -21,7 +21,7 @@ import {
 import { getSocket } from "@/lib/socket";
 import { useAuth } from "@/app/providers/AuthProvider";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5001";
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 type Notif = {
   _id: string;
@@ -198,58 +198,55 @@ useEffect(() => {
         <div className="flex items-center gap-4">
 
           {/* NOTIFICATIONS */}
-          {isReady ? (
-            <div className="relative" ref={notifRef}>
-              <button
-                onClick={() => setNotifOpen((p) => !p)}
-                className="p-2 rounded-lg hover:bg-gray-700/60 relative"
-              >
-                <Bell className="w-5 h-5 text-white" />
-                {unread > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs px-1.5 rounded-full">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </button>
+          {notifOpen && (
+  <div
+    className={`
+      absolute mt-2 w-80 bg-gray-900 border border-gray-700 shadow-xl rounded-xl p-2 z-[200]
+      ${typeof window !== "undefined" && window.innerWidth < 768
+        ? "left-1/2 -translate-x-1/2 top-12" // MOBILE → center it
+        : "right-0"}                         // DESKTOP → align right
+    `}
+  >
+    <div className="flex justify-between text-sm text-gray-300 p-2 border-b border-gray-700">
+      Notifications
+      <Link href="/notifications" className="text-cyan-400 text-xs">View All</Link>
+    </div>
 
-              {notifOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-gray-900 border border-gray-700 shadow-xl rounded-xl p-2 z-[200]">
-                  <div className="flex justify-between text-sm text-gray-300 p-2 border-b border-gray-700">
-                    Notifications
-                    <Link href="/notifications" className="text-cyan-400 text-xs">View All</Link>
-                  </div>
-
-                  <div className="max-h-64 overflow-y-auto">
-                    {notifs.length === 0 ? (
-                      <p className="text-gray-400 text-sm p-3">No notifications</p>
-                    ) : (
-                      notifs.map((n) => (
-                        <div
-                          key={n._id}
-                          className={`p-3 mt-1 rounded flex justify-between items-center ${
-                            n.read ? "bg-gray-800/40" : "bg-gray-800"
-                          }`}
-                        >
-                          <div className="flex-1 pr-2">
-                            <p className="text-white text-sm">{n.message}</p>
-                            <p className="text-xs text-gray-500">{new Date(n.createdAt).toLocaleString()}</p>
-                          </div>
-
-                          {!n.read ? (
-                            <Check className="text-emerald-400 cursor-pointer" onClick={() => markAsRead(n._id)} />
-                          ) : (
-                            <Trash2 className="text-red-400 cursor-pointer" onClick={() => deleteNotif(n._id)} />
-                          )}
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
+    <div className="max-h-64 overflow-y-auto">
+      {notifs.length === 0 ? (
+        <p className="text-gray-400 text-sm p-3">No notifications</p>
+      ) : (
+        notifs.map((n) => (
+          <div
+            key={n._id}
+            className={`p-3 mt-1 rounded flex justify-between items-center ${
+              n.read ? "bg-gray-800/40" : "bg-gray-800"
+            }`}
+          >
+            <div className="flex-1 pr-2">
+              <p className="text-white text-sm">{n.message}</p>
+              <p className="text-xs text-gray-500">
+                {new Date(n.createdAt).toLocaleString()}
+              </p>
             </div>
-          ) : (
-            <div className="w-8 h-8 rounded-full bg-gray-700 animate-pulse" />
-          )}
+
+            {!n.read ? (
+              <Check
+                className="text-emerald-400 cursor-pointer"
+                onClick={() => markAsRead(n._id)}
+              />
+            ) : (
+              <Trash2
+                className="text-red-400 cursor-pointer"
+                onClick={() => deleteNotif(n._id)}
+              />
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  </div>
+)}
 
           {/* USER MENU */}
           {isReady ? (

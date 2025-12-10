@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
-import toast from "react-hot-toast";
 import { useChatGlobal } from "@/app/providers/ChatProvider";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -20,6 +19,7 @@ type UserMini = {
 export default function ChatInboxPage() {
   const router = useRouter();
 
+  // From ChatProvider: socket + loggedUser
   const { socket, socketReady, currentUser, setCurrentUser, ready } =
     useChatGlobal();
 
@@ -28,82 +28,105 @@ export default function ChatInboxPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
 
-  /* LOAD CURRENT USER + CONNECTED USERS */
-  async function loadUsers() {
-    try {
-      const meRes = await fetch(`${API_URL}/api/auth/me`, {
-        credentials: "include",
-      });
-
-      const meData = await meRes.json();
-      if (!meData.user) return router.push("/login");
-
-      setCurrentUser(meData.user);
-
-      const res = await fetch(`${API_URL}/api/chat/users`, {
-        credentials: "include",
-      });
-
-      const list = await res.json();
-
-      // Remove myself
-      const filtered = list.filter((u: UserMini) => u._id !== meData.user._id);
-
-      setUsers(filtered);
-    } catch (err) {
-      console.error("Inbox load error:", err);
-    }
-  }
-
+  /* ----------------------------------------------------------
+     Load logged user ONLY once (no multiple backend hits)
+  ---------------------------------------------------------- */
   useEffect(() => {
     if (!ready) return;
-    loadUsers().finally(() => setLoading(false));
+
+    const loadUser = async () => {
+      const res = await fetch(`${API_URL}/api/auth/me`, {
+        credentials: "include",
+      });
+      const data = await res.json();
+
+      if (!data.user) return router.replace("/login");
+      setCurrentUser(data.user);
+    };
+
+    loadUser();
   }, [ready]);
 
-  /* SOCKET ONLINE/OFFLINE EVENTS */
+  /* ----------------------------------------------------------
+     Load user list AFTER socket connects (fastest)
+  ---------------------------------------------------------- */
+  const loadUserList = useCallback(async () => {
+    if (!currentUser) return;
+
+    const res = await fetch(`${API_URL}/api/chat/users`, {
+      credentials: "include",
+    });
+
+    const list = await res.json();
+
+    setUsers(list.filter((u: UserMini) => u._id !== currentUser._id));
+    setLoading(false);
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!socketReady || !currentUser) return;
+    loadUserList();
+  }, [socketReady, currentUser]);
+
+  /* ----------------------------------------------------------
+     SOCKET EVENTS
+  ---------------------------------------------------------- */
   useEffect(() => {
     if (!socket) return;
 
-    const handleOnline = (id: string) =>
+    // Online user appeared
+    const handleOnline = (id: string) => {
       setOnline((prev) => [...new Set([...prev, id])]);
+    };
 
-    const handleOffline = (id: string) =>
+    // User went offline
+    const handleOffline = (id: string) => {
       setOnline((prev) => prev.filter((x) => x !== id));
+    };
 
-    const handleOnlineUsers = (list: string[]) => {
+    // Server sends online list ONCE after login
+    const handleOnlineList = (list: string[]) => {
       setOnline(list || []);
     };
 
     socket.on("userOnline", handleOnline);
     socket.on("userOffline", handleOffline);
-    socket.on("onlineUsers", handleOnlineUsers);
+    socket.on("onlineUsers", handleOnlineList);
 
-    socket.emit("getOnlineUsers");
+    // request only once
+    if (socketReady) socket.emit("getOnlineUsers");
 
     return () => {
       socket.off("userOnline", handleOnline);
       socket.off("userOffline", handleOffline);
-      socket.off("onlineUsers", handleOnlineUsers);
+      socket.off("onlineUsers", handleOnlineList);
     };
+  }, [socket, socketReady]);
+
+  /* ----------------------------------------------------------
+     New Message Notification → only update that user
+  ---------------------------------------------------------- */
+  useEffect(() => {
+    if (!socket) return;
+
+    const handler = (data: { from: string }) => {
+      setUsers((prev) =>
+        prev.map((u) =>
+          u._id === data.from
+            ? { ...u, unreadCount: (u.unreadCount || 0) + 1 }
+            : u
+        )
+      );
+    };
+
+    socket.on("newMessageNotification", handler);
+
+    return () => socket.off("newMessageNotification", handler);
   }, [socket]);
 
-  /* NEW MESSAGE NOTIFICATION */
-useEffect(() => {
-  if (!socket) return;
-
-  const handler = () => {
-    loadUsers(); 
-  };
-
-  socket.on("newMessageNotification", handler);
-
-  return () => {
-    socket.off("newMessageNotification", handler);
-  };
-}, [socket]);  
-
-
-  /* SEARCH FILTER */
+  /* ----------------------------------------------------------
+     SEARCH FILTER
+  ---------------------------------------------------------- */
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return users.filter(
@@ -113,11 +136,14 @@ useEffect(() => {
     );
   }, [users, search]);
 
-  /* UI */
+  /* ----------------------------------------------------------
+     UI
+  ---------------------------------------------------------- */
   return (
     <div className="flex h-screen pt-20 bg-black text-white">
       <aside className="w-full md:w-96 border-r border-gray-800 p-4">
 
+        {/* HEADER */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold">Chats</h2>
 
@@ -133,14 +159,17 @@ useEffect(() => {
         </div>
 
         {!socketReady && (
-          <p className="text-xs text-yellow-400 mb-2">Connecting...</p>
+          <p className="text-xs text-yellow-400 mb-2">
+            Connecting to chat…
+          </p>
         )}
 
+        {/* CHAT LIST */}
         <div className="space-y-2 overflow-auto h-[calc(100vh-150px)]">
           {loading ? (
             <p className="text-gray-400">Loading…</p>
           ) : filtered.length === 0 ? (
-            <p className="text-gray-400">No connected users</p>
+            <p className="text-gray-400">No users found</p>
           ) : (
             filtered.map((u) => (
               <Link
@@ -155,7 +184,6 @@ useEffect(() => {
                 <div className="flex-1">
                   <div className="flex justify-between">
                     <span className="font-semibold">{u.name}</span>
-
                     {online.includes(u._id) && (
                       <span className="text-xs text-emerald-400">Online</span>
                     )}

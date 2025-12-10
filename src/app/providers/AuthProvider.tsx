@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -9,10 +9,11 @@ const AuthContext = createContext<any>(null);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [loadedOnce, setLoadedOnce] = useState(false); // ⭐ prevents duplicate calls
+  const initialized = useRef(false);
 
   useEffect(() => {
-    if (loadedOnce) return; // ❗ stop multiple calls
+    if (initialized.current) return;
+    initialized.current = true;
 
     async function loadUser() {
       try {
@@ -22,19 +23,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         const data = await res.json();
-        if (data?.user) setUser(data.user);
-      } catch {}
+        if (data?.user) {
+          setUser(data.user);
+        }
+      } catch (err) {
+        console.error("Auth load error:", err);
+      }
 
       setLoading(false);
-      setLoadedOnce(true); // ❗ never call again
     }
 
     loadUser();
-  }, [loadedOnce]);
+  }, []);
 
   return (
     <AuthContext.Provider value={{ user, setUser, loading }}>
-      {children}
+      {/* Only render children AFTER auth loads */}
+      {!loading && children}
     </AuthContext.Provider>
   );
 }

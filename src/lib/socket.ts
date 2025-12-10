@@ -1,9 +1,8 @@
 // lib/socket.ts
 import { io, Socket } from "socket.io-client";
+import Cookies from "js-cookie";
 
 let socket: Socket | null = null;
-
-// Prevents multiple reconnections
 let isConnecting = false;
 
 export function getSocket(): Socket | null {
@@ -11,20 +10,27 @@ export function getSocket(): Socket | null {
 
   const API = process.env.NEXT_PUBLIC_API_URL;
 
-  // If already created, always return same socket instance
+  // Already created → reuse
   if (socket) return socket;
 
-  // Prevent multiple initializations during rapid renders
   if (isConnecting) return socket;
   isConnecting = true;
 
-  socket = io(API, {
+  // Get socket token from cookie
+  const token = Cookies.get("socketToken");
+
+  socket = io(API!, {
+    path: "/socket.io",
     transports: ["websocket"],
     withCredentials: true,
     autoConnect: true,
+
+    // FIX: server requires this!
+    auth: { token },
+
     reconnection: true,
-    reconnectionAttempts: 5,
-    reconnectionDelay: 500,
+    reconnectionAttempts: 10,
+    reconnectionDelay: 800,
   });
 
   socket.on("connect", () => {
