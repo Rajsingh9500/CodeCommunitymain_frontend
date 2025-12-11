@@ -188,67 +188,71 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ======================== TESTIMONIALS ======================== */}
-      <section className="py-24 bg-gradient-to-r from-gray-950 via-gray-900 to-black text-center">
-        <h2 className="text-4xl font-bold text-emerald-400 mb-12">
-          What Our Users Say
-        </h2>
+{/* ======================== TESTIMONIALS ======================== */}
+<section className="py-24 bg-gradient-to-r from-gray-950 via-gray-900 to-black text-center">
+  <h2 className="text-4xl font-bold text-emerald-400 mb-12">
+    What Our Users Say
+  </h2>
 
-        {loading ? (
-          <p className="text-gray-500">Loading testimonials...</p>
-        ) : (
-          <Slider
-  dots={true}
-  infinite={true}
-  arrows={false}
-  autoplay={true}
-  speed={600}
-  autoplaySpeed={2600}
-  slidesToShow={4} // Desktop
-  responsive={[
-    { breakpoint: 1280, settings: { slidesToShow: 3 } },
-    { breakpoint: 1024, settings: { slidesToShow: 2 } },
-    { breakpoint: 768,  settings: { slidesToShow: 1 } },
-    { breakpoint: 480,  settings: { slidesToShow: 1 } },
-  ]}
->
-  {testimonials.map((t, i) => {
-    const firstLetter = t.name?.charAt(0)?.toUpperCase();
+  {loading ? (
+    <p className="text-gray-500">Loading testimonials...</p>
+  ) : (
+    <div className="w-full max-w-7xl mx-auto px-4 overflow-hidden">
+      <Slider
+        dots={true}
+        infinite={true}
+        arrows={false}
+        autoplay={true}
+        speed={600}
+        autoplaySpeed={2600}
+        slidesToShow={4}
+        slidesToScroll={1}
+        adaptiveHeight={true}
+        responsive={[
+          { breakpoint: 1280, settings: { slidesToShow: 3 } },
+          { breakpoint: 1024, settings: { slidesToShow: 2 } },
+          { breakpoint: 768, settings: { slidesToShow: 1 } },
+        ]}
+      >
+        {testimonials.map((t, i) => {
+          const firstLetter = t.name?.charAt(0)?.toUpperCase() || "U";
 
-    return (
-      <div key={i} className="px-4">
-        <div className="bg-gray-800/50 p-6 rounded-2xl border border-gray-700
-                        hover:border-emerald-400 transition shadow-lg
-                        min-h-[260px] flex flex-col items-center justify-start">
+          return (
+            <div key={i} className="px-4 min-w-0">
+              <div className="bg-gray-800/50 p-6 rounded-2xl 
+                              border border-gray-700 hover:border-emerald-400 
+                              transition shadow-lg h-full 
+                              flex flex-col items-center text-center">
 
-          {/* AVATAR FIRST LETTER */}
-          <div className="w-[80px] h-[80px] rounded-full flex items-center justify-center 
-                          text-3xl font-bold mb-4 
-                          bg-gradient-to-br from-emerald-400 via-cyan-400 to-blue-500
-                          text-black shadow-md shadow-emerald-500/20">
-            {firstLetter}
-          </div>
+                {/* FIRST LETTER AVATAR */}
+                <div className="w-20 h-20 rounded-full flex items-center justify-center 
+                                text-3xl font-bold mb-4
+                                bg-gradient-to-br from-emerald-400 via-cyan-400 to-blue-500
+                                text-black shadow-lg shadow-emerald-500/20">
+                  {firstLetter}
+                </div>
 
-          {/* NAME */}
-          <h3 className="font-semibold capitalize">{t.name}</h3>
+                {/* NAME */}
+                <h3 className="font-semibold text-white capitalize text-lg">
+                  {t.name}
+                </h3>
 
-          {/* ROLE */}
-          <p className="text-gray-400 text-sm">{t.role || "User"}</p>
+                {/* ROLE */}
+                <p className="text-gray-400 text-sm">{t.role || "User"}</p>
 
-          {/* FEEDBACK */}
-          <p className="text-gray-300 italic mt-3 text-sm px-3">
-            “{t.feedback}”
-          </p>
-        </div>
-      </div>
-    );
-  })}
-</Slider>
+                {/* FEEDBACK */}
+                <p className="text-gray-300 italic mt-4 text-sm leading-relaxed line-clamp-4 px-2">
+                  “{t.feedback}”
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </Slider>
+    </div>
+  )}
+</section>
 
-
-
-        )}
-      </section>
 
       <Footer />
     </div>
