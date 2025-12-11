@@ -2,20 +2,23 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export function middleware(req: NextRequest) {
-  const token = req.cookies.get("token")?.value;
+  // Read token from secure cookie OR fallback to socketToken
+  const token =
+    req.cookies.get("token")?.value ||
+    req.cookies.get("socketToken")?.value;
+
   const path = req.nextUrl.pathname;
 
-  // Public routes (accessible without login)
+  // Public routes
   const publicRoutes = ["/login", "/register"];
-
   const isPublic = publicRoutes.some((route) => path.startsWith(route));
 
-  // If user is NOT logged in → block ALL routes except login/register
+  // Block all protected routes
   if (!token && !isPublic) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
-  // If user IS logged in → prevent access to login/register
+  // Prevent logged-in users from visiting login/register
   if (token && isPublic) {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
@@ -24,6 +27,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  // Protect ALL pages except API, static files, next internal files
   matcher: ["/((?!api|_next|static|favicon.ico).*)"],
 };
