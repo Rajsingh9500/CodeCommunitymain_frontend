@@ -79,9 +79,7 @@ export default function Header() {
 
     void loadNotifs();
 
-    const listener = (notif: Notif) => {
-      void handleIncomingNotif(notif);
-    };
+    const listener = (notif: Notif) => handleIncomingNotif(notif);
 
     s.on("notification:new", listener);
 
@@ -93,7 +91,7 @@ export default function Header() {
   }, [user, loadNotifs, handleIncomingNotif]);
 
   /* --------------------------------------------------------
-     Read/Delete
+     Mark One Read
   -------------------------------------------------------- */
   const markAsRead = async (id: string) => {
     setNotifs((prev) => prev.map((n) => (n._id === id ? { ...n, read: true } : n)));
@@ -105,6 +103,24 @@ export default function Header() {
     });
   };
 
+  /* --------------------------------------------------------
+     Mark All Read
+  -------------------------------------------------------- */
+  const markAllAsRead = async () => {
+    if (notifs.length === 0) return;
+
+    setNotifs((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnread(0);
+
+    await fetch(`${API_URL}/api/notifications/read-all`, {
+      method: "PATCH",
+      credentials: "include",
+    });
+  };
+
+  /* --------------------------------------------------------
+     Delete One
+  -------------------------------------------------------- */
   const deleteNotif = async (id: string) => {
     setNotifs((prev) => prev.filter((n) => n._id !== id));
 
@@ -120,6 +136,7 @@ export default function Header() {
   useEffect(() => {
     const close = (e: MouseEvent) => {
       const t = e.target as Node;
+
       if (notifRef.current && !notifRef.current.contains(t)) setNotifOpen(false);
       if (userRef.current && !userRef.current.contains(t)) setUserMenu(false);
     };
@@ -201,95 +218,133 @@ export default function Header() {
               </button>
 
               {/* DROPDOWN */}
-             {/* NOTIFICATION DROPDOWN */}
-{notifOpen && (
-  <>
-    {/* DESKTOP DROPDOWN */}
-    <div 
-      className="
-        hidden md:block      /* desktop only */
-        absolute top-10 right-0
-        w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[200]
-      "
-      ref={notifRef}
-    >
-      <div className="flex justify-between text-sm text-gray-300 p-3 border-b border-gray-700">
-        Notifications
-        <Link href="/notifications" className="text-cyan-400 text-xs">View All</Link>
-      </div>
+              {notifOpen && (
+                <>
+                  {/* DESKTOP DROPDOWN */}
+                  <div 
+                    className="
+                      hidden md:block
+                      absolute top-10 right-0
+                      w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[200]
+                    "
+                  >
+                    <div className="flex justify-between text-sm text-gray-300 p-3 border-b border-gray-700">
+                      <span>Notifications</span>
 
-      <div className="max-h-64 overflow-y-auto">
-        {notifs.length === 0 ? (
-          <p className="text-gray-400 text-sm p-3">No notifications</p>
-        ) : (
-          notifs.map((n) => (
-            <div 
-              key={n._id}
-              className={`p-3 border-b border-gray-800 last:border-none flex justify-between ${
-                n.read ? "bg-gray-800/40" : "bg-gray-800"
-              }`}
-            >
-              <div className="pr-2">
-                <p className="text-white text-sm">{n.message}</p>
-                <p className="text-xs text-gray-500">{new Date(n.createdAt).toLocaleString()}</p>
-              </div>
+                      <div className="flex items-center gap-3">
+                        {unread > 0 && (
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-emerald-400 text-xs hover:underline"
+                          >
+                            Mark all read
+                          </button>
+                        )}
 
-              {!n.read ? (
-                <Check className="text-emerald-400 cursor-pointer" onClick={() => markAsRead(n._id)} />
-              ) : (
-                <Trash2 className="text-red-400 cursor-pointer" onClick={() => deleteNotif(n._id)} />
+                        <Link href="/notifications" className="text-cyan-400 text-xs">
+                          View All
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className="max-h-64 overflow-y-auto">
+                      {notifs.length === 0 ? (
+                        <p className="text-gray-400 text-sm p-3">No notifications</p>
+                      ) : (
+                        notifs.map((n) => (
+                          <div 
+                            key={n._id}
+                            className={`p-3 border-b border-gray-800 last:border-none flex justify-between ${
+                              n.read ? "bg-gray-800/40" : "bg-gray-800"
+                            }`}
+                          >
+                            <div className="pr-2">
+                              <p className="text-white text-sm">{n.message}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(n.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+
+                            {!n.read ? (
+                              <Check
+                                className="text-emerald-400 cursor-pointer"
+                                onClick={() => markAsRead(n._id)}
+                              />
+                            ) : (
+                              <Trash2
+                                className="text-red-400 cursor-pointer"
+                                onClick={() => deleteNotif(n._id)}
+                              />
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  {/* MOBILE DROPDOWN */}
+                  <div 
+                    className="
+                      md:hidden
+                      fixed top-20 left-1/2 -translate-x-1/2
+                      w-[90%] bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[999]
+                    "
+                  >
+                    <div className="flex justify-between text-sm text-gray-300 p-3 border-b border-gray-700">
+                      <span>Notifications</span>
+
+                      <div className="flex items-center gap-3">
+                        {unread > 0 && (
+                          <button
+                            onClick={markAllAsRead}
+                            className="text-emerald-400 text-xs hover:underline"
+                          >
+                            Mark all read
+                          </button>
+                        )}
+
+                        <Link href="/notifications" className="text-cyan-400 text-xs">
+                          View All
+                        </Link>
+                      </div>
+                    </div>
+
+                    <div className="max-h-80 overflow-y-auto">
+                      {notifs.length === 0 ? (
+                        <p className="text-gray-400 text-sm p-4 text-center">No notifications</p>
+                      ) : (
+                        notifs.map((n) => (
+                          <div 
+                            key={n._id}
+                            className={`p-4 border-b border-gray-800 last:border-none flex justify-between ${
+                              n.read ? "bg-gray-800/40" : "bg-gray-800"
+                            }`}
+                          >
+                            <div className="pr-2">
+                              <p className="text-white text-sm">{n.message}</p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(n.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+
+                            {!n.read ? (
+                              <Check
+                                className="text-emerald-400 cursor-pointer"
+                                onClick={() => markAsRead(n._id)}
+                              />
+                            ) : (
+                              <Trash2
+                                className="text-red-400 cursor-pointer"
+                                onClick={() => deleteNotif(n._id)}
+                              />
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </>
               )}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-
-
-    {/* MOBILE DROPDOWN (FULL WIDTH CENTERED) */}
-    <div 
-      className="
-        md:hidden           /* mobile only */
-        fixed top-20 left-1/2 -translate-x-1/2
-        w-[90%] bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[999]
-      "
-      ref={notifRef}
-    >
-      <div className="flex justify-between text-sm text-gray-300 p-3 border-b border-gray-700">
-        Notifications
-        <Link href="/notifications" className="text-cyan-400 text-xs">View All</Link>
-      </div>
-
-      <div className="max-h-80 overflow-y-auto">
-        {notifs.length === 0 ? (
-          <p className="text-gray-400 text-sm p-4 text-center">No notifications</p>
-        ) : (
-          notifs.map((n) => (
-            <div 
-              key={n._id}
-              className={`p-4 border-b border-gray-800 last:border-none flex justify-between ${
-                n.read ? "bg-gray-800/40" : "bg-gray-800"
-              }`}
-            >
-              <div className="pr-2">
-                <p className="text-white text-sm">{n.message}</p>
-                <p className="text-xs text-gray-500">{new Date(n.createdAt).toLocaleString()}</p>
-              </div>
-
-              {!n.read ? (
-                <Check className="text-emerald-400 cursor-pointer" onClick={() => markAsRead(n._id)} />
-              ) : (
-                <Trash2 className="text-red-400 cursor-pointer" onClick={() => deleteNotif(n._id)} />
-              )}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  </>
-)}
-
-
             </div>
           )}
 
