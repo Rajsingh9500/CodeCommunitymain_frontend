@@ -204,26 +204,51 @@ export default function HomePage() {
   autoplay={true}
   speed={600}
   autoplaySpeed={2800}
-  slidesToShow={4} // DEFAULT: 4 slides on large screens
+  slidesToShow={4} // Desktop default
   responsive={[
-    {
-      breakpoint: 1280, // large laptops / tablets
-      settings: { slidesToShow: 3 },
-    },
-    {
-      breakpoint: 1024, // tablets
-      settings: { slidesToShow: 2 },
-    },
-    {
-      breakpoint: 768, // mobile landscape
-      settings: { slidesToShow: 1 },
-    },
-    {
-      breakpoint: 480, // small mobile
-      settings: { slidesToShow: 1 },
-    },
+    { breakpoint: 1280, settings: { slidesToShow: 3 } },
+    { breakpoint: 1024, settings: { slidesToShow: 2 } },
+    { breakpoint: 768,  settings: { slidesToShow: 1 } },
+    { breakpoint: 480,  settings: { slidesToShow: 1 } },
   ]}
-/>
+>
+  {testimonials.map((t, i) => {
+    const img =
+      t.image?.startsWith("http")
+        ? t.image
+        : t.image
+        ? `${process.env.NEXT_PUBLIC_API_URL}${t.image}`
+        : null; // no image → fallback avatar
+
+    return (
+      <div key={i} className="px-4">
+        <div className="bg-gray-800/70 p-8 rounded-2xl border border-gray-700 hover:border-emerald-400 transition shadow-lg">
+
+          {/* IMAGE OR FIRST LETTER AVATAR */}
+          {img ? (
+            <Image
+              src={img}
+              alt={t.name}
+              width={85}
+              height={85}
+              className="rounded-full mx-auto mb-4 object-cover"
+            />
+          ) : (
+            <div className="w-[85px] h-[85px] mx-auto mb-4 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-3xl font-bold">
+              {t.name?.charAt(0)?.toUpperCase()}
+            </div>
+          )}
+
+          {/* NAME + ROLE + FEEDBACK */}
+          <h3 className="font-semibold">{t.name}</h3>
+          <p className="text-gray-400 text-sm">{t.role || "User"}</p>
+          <p className="text-gray-300 italic mt-2">“{t.feedback}”</p>
+        </div>
+      </div>
+    );
+  })}
+</Slider>
+
 
         )}
       </section>
