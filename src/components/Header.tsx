@@ -206,7 +206,7 @@ export default function Header() {
     className="
       absolute top-10 right-0     /* Always under bell icon */
       w-80 bg-gray-900 border border-gray-700 
-      shadow-xl rounded-xl p-2 z-[200] mt-2
+      shadow-xl rounded-xl p-2 z-[200] mt-2 ml-5
     "
   >
     <div className="flex justify-between text-sm text-gray-300 p-2 border-b border-gray-700">
