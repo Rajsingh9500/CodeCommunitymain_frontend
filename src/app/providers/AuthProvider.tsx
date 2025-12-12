@@ -22,12 +22,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           cache: "no-store",
         });
 
-        const data = await res.json();
-        if (data?.user) {
-          setUser(data.user);
+        if (res.status === 200) {
+          const data = await res.json();
+
+          const formatted = {
+            ...data.user,
+            // socketToken comes from cookie, not backend "user"
+            socketToken: document.cookie
+              .split("; ")
+              .find((row) => row.startsWith("socketToken="))
+              ?.split("=")[1] || null,
+          };
+
+          setUser(formatted);
+        } else {
+          setUser(null);
         }
       } catch (err) {
         console.error("Auth load error:", err);
+        setUser(null);
       }
 
       setLoading(false);
@@ -38,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, setUser, loading }}>
-      {/* Only render children AFTER auth loads */}
+      {/* ⛔ Prevents UI rendering before auth is loaded */}
       {!loading && children}
     </AuthContext.Provider>
   );

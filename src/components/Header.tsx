@@ -44,26 +44,39 @@ export default function Header() {
   const notifRef = useRef<HTMLDivElement | null>(null);
   const userRef = useRef<HTMLDivElement | null>(null);
 
+  const isReady = !loading && user;
+
   /* --------------------------------------------------------
      Load Notifications
-  -------------------------------------------------------- */
-  const loadNotifs = useCallback(async () => {
-    if (!user) return;
+/* --------------------------------------------------------
+   Load Notifications
+-------------------------------------------------------- */
+const loadNotifs = useCallback(async () => {
+  if (!user) return;
 
-    try {
-      const res = await fetch(`${API_URL}/api/notifications`, {
-        credentials: "include",
-      });
-      const data = await res.json();
+  try {
+    const res = await fetch(`${API_URL}/api/notifications`, {
+      credentials: "include",
+    });
 
-      if (data?.notifications) {
-        setNotifs(data.notifications);
-        setUnread(data.notifications.filter((n: Notif) => !n.read).length);
-      }
-    } catch (err) {
-      console.error("Failed loading notifications:", err);
+    if (res.status === 401) return;
+
+    const data = await res.json();
+
+    if (Array.isArray(data?.notifications)) {
+      const notifications: Notif[] = data.notifications;
+
+      setNotifs(notifications);
+
+      // FIXED: Type-safe unread calculation
+      const unreadCount = notifications.filter((n: Notif) => !n.read).length;
+      setUnread(unreadCount);
     }
-  }, [user]);
+  } catch (err) {
+    console.error("Failed loading notifications:", err);
+  }
+}, [user]);
+
 
   /* --------------------------------------------------------
      Handle incoming socket notifications
@@ -71,14 +84,21 @@ export default function Header() {
   const handleIncomingNotif = useCallback((n: Notif) => {
     setNotifs((prev) => [n, ...prev]);
     setUnread((u) => u + 1);
-    toast("New Notification 🔔");
+    toast.success("New Notification 🔔");
   }, []);
 
+  /* --------------------------------------------------------
+     SOCKET SETUP — FIXED
+  -------------------------------------------------------- */
   useEffect(() => {
+    if (loading) return;
     if (!user) return;
 
-    const socket = getSocket();
-    if (!socket) return;
+    const socket = getSocket(user.id);
+
+    if (!socket.connected) {
+      socket.connect();
+    }
 
     loadNotifs();
 
@@ -87,7 +107,7 @@ export default function Header() {
     return () => {
       socket.off("notification:new", handleIncomingNotif);
     };
-  }, [user, loadNotifs, handleIncomingNotif]);
+  }, [user, loading, loadNotifs, handleIncomingNotif]);
 
   /* --------------------------------------------------------
      Mark One Read
@@ -134,12 +154,8 @@ export default function Header() {
     const closeMenus = (e: MouseEvent) => {
       const target = e.target as Node;
 
-      if (notifRef.current && !notifRef.current.contains(target)) {
-        setNotifOpen(false);
-      }
-      if (userRef.current && !userRef.current.contains(target)) {
-        setUserMenu(false);
-      }
+      if (notifRef.current && !notifRef.current.contains(target)) setNotifOpen(false);
+      if (userRef.current && !userRef.current.contains(target)) setUserMenu(false);
     };
 
     document.addEventListener("mousedown", closeMenus);
@@ -147,7 +163,7 @@ export default function Header() {
   }, []);
 
   /* --------------------------------------------------------
-     Close Menus on Page Change
+     Close Menus on Route Change
   -------------------------------------------------------- */
   useEffect(() => {
     setMobileOpen(false);
@@ -155,7 +171,9 @@ export default function Header() {
     setUserMenu(false);
   }, [pathname]);
 
-  const isReady = !loading && user;
+  /* --------------------------------------------------------
+     RETURN JSX
+  -------------------------------------------------------- */
 
   return (
     <header className="fixed top-0 left-0 w-full px-4 py-3 bg-black/80 border-b border-gray-800 backdrop-blur-xl z-[100]">
@@ -209,26 +227,17 @@ export default function Header() {
                 className="p-2 rounded hover:bg-gray-800/60 transition relative"
               >
                 <Bell className="w-6 h-6 text-gray-300" />
-
                 {unread > 0 && (
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white 
-                                   text-xs rounded-full flex items-center justify-center">
+                    text-xs rounded-full flex items-center justify-center">
                     {unread}
                   </span>
                 )}
               </button>
 
-              {/* --------------------------------------------------------
-                   DESKTOP DROPDOWN
-                 -------------------------------------------------------- */}
+              {/* ⭐ DESKTOP DROPDOWN */}
               {notifOpen && (
-                <div 
-                  className="
-                    hidden md:block
-                    absolute top-10 right-0
-                    w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[200]
-                  "
-                >
+                <div className="hidden md:block absolute top-10 right-0 w-80 bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[200]">
                   <NotifDropdownDesktop
                     notifs={notifs}
                     unread={unread}
@@ -239,17 +248,10 @@ export default function Header() {
                 </div>
               )}
 
-              {/* --------------------------------------------------------
-                   MOBILE DROPDOWN
-                 -------------------------------------------------------- */}
+              {/* ⭐ MOBILE DROPDOWN */}
               {notifOpen && (
-                <div 
-                  className="
-                    md:hidden
-                    fixed top-20 left-1/2 -translate-x-1/2
-                    w-[90%] bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[999]
-                  "
-                >
+                <div className="md:hidden fixed top-20 left-1/2 -translate-x-1/2 w-[90%]
+                  bg-gray-900 border border-gray-700 rounded-xl shadow-xl z-[999]">
                   <NotifDropdownMobile
                     notifs={notifs}
                     unread={unread}
@@ -298,7 +300,7 @@ export default function Header() {
 }
 
 /* --------------------------------------------------------
-   COMPONENTS SEPARATED FOR CLEANER CODE
+   NOTIFICATION DROPDOWNS
 -------------------------------------------------------- */
 
 function NotifDropdownDesktop({ notifs, unread, markAllAsRead, markAsRead, deleteNotif }: any) {
@@ -398,6 +400,7 @@ function NotifDropdownMobile({ notifs, unread, markAllAsRead, markAsRead, delete
 /* --------------------------------------------------------
    USER MENU
 -------------------------------------------------------- */
+
 function UserMenu({ user, userRef, userMenu, setUserMenu, setUser, router }: any) {
   return (
     <div className="relative hidden lg:block" ref={userRef}>
@@ -447,6 +450,7 @@ function UserMenu({ user, userRef, userMenu, setUserMenu, setUser, router }: any
 /* --------------------------------------------------------
    MOBILE SIDEBAR
 -------------------------------------------------------- */
+
 function MobileSidebar({ user, isReady, setUser, setMobileOpen, router }: any) {
   return (
     <>
