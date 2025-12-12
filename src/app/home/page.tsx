@@ -181,6 +181,7 @@ export default function HomePage() {
         </div>
       </section>
 {/* ================= TESTIMONIALS ================= */}
+{/* ================= TESTIMONIALS ================= */}
 <section className="py-24 bg-gradient-to-r from-gray-950 via-gray-900 to-black text-center">
   <h2 className="text-4xl font-bold text-emerald-400 mb-12">What Our Users Say</h2>
 
@@ -189,63 +190,118 @@ export default function HomePage() {
   ) : testimonials.length === 0 ? (
     <p className="text-gray-500">No testimonials yet.</p>
   ) : (
-    <Slider
-      dots
-      infinite={testimonials.length > 1}
-      arrows={false}
-      autoplay={testimonials.length > 1}
-      speed={600}
-      autoplaySpeed={2600}
-      slidesToShow={Math.min(4, testimonials.length)}
-      responsive={[
-        { breakpoint: 1280, settings: { slidesToShow: Math.min(3, testimonials.length) }},
-        { breakpoint: 1024, settings: { slidesToShow: Math.min(2, testimonials.length) }},
-        { breakpoint: 768, settings: { slidesToShow: 1 }},
-      ]}
-    >
-      {testimonials.map((t, i) => {
-        const expanded = expandedList[i];
-        const feedback = t.feedback;
-        const firstLetter = t.name?.charAt(0)?.toUpperCase() || "U";
+    <>
+      {/* ================= DESKTOP SLIDER ================= */}
+      <div className="hidden md:block">
+        <Slider
+          dots
+          infinite={testimonials.length > 1}
+          arrows={false}
+          autoplay
+          speed={600}
+          autoplaySpeed={2600}
+          slidesToShow={Math.min(4, testimonials.length)}
+        >
+          {testimonials.map((t, i) => {
+            const expanded = expandedList[i];
+            const feedback = t.feedback;
+            const firstLetter = t.name?.charAt(0)?.toUpperCase() || "U";
 
-        const shortText =
-          feedback.length > 100 ? feedback.slice(0, 100) + "..." : feedback;
+            const shortText =
+              feedback.length > 120 ? feedback.slice(0, 120) + "..." : feedback;
 
-        return (
-          <div key={i} className="px-4">
-            <div className="bg-gray-800/60 p-6 rounded-2xl border border-gray-700
-                            hover:border-emerald-400 transition shadow-lg min-h-[280px]
-                            flex flex-col items-center">
+            return (
+              <div key={i} className="px-4">
+                <div className="bg-gray-800/60 p-6 rounded-2xl border border-gray-700
+                                hover:border-emerald-400 transition shadow-lg min-h-[280px]
+                                flex flex-col items-center">
 
-              {/* Avatar */}
-              <div className="w-[70px] h-[70px] rounded-full bg-gradient-to-br 
-                              from-emerald-400 via-cyan-400 to-blue-500 text-black flex 
-                              items-center justify-center text-3xl font-bold mb-4">
-                {firstLetter}
+                  {/* Avatar */}
+                  <div className="w-[70px] h-[70px] rounded-full bg-gradient-to-br 
+                                  from-emerald-400 via-cyan-400 to-blue-500 text-black flex 
+                                  items-center justify-center text-3xl font-bold mb-4">
+                    {firstLetter}
+                  </div>
+
+                  <h3 className="font-semibold text-lg capitalize">{t.name}</h3>
+                  <p className="text-gray-400 text-sm">{t.role || "User"}</p>
+
+                  <p className="text-gray-300 italic mt-3 text-sm px-2">
+                    “{expanded ? feedback : shortText}”
+                  </p>
+
+                  {feedback.length > 120 && (
+                    <button
+                      onClick={() => toggleExpandAt(i)}
+                      className="mt-2 text-cyan-400 text-sm hover:underline"
+                    >
+                      {expanded ? "See Less" : "See More"}
+                    </button>
+                  )}
+                </div>
               </div>
+            );
+          })}
+        </Slider>
+      </div>
 
-              <h3 className="font-semibold text-lg capitalize">{t.name}</h3>
-              <p className="text-gray-400 text-sm">{t.role || "User"}</p>
+      {/* ================= MOBILE SLIDER ================= */}
+      <div className="md:hidden">
+        <Slider
+          dots
+          infinite={testimonials.length > 1}
+          arrows={false}
+          autoplay
+          speed={600}
+          autoplaySpeed={2600}
+          slidesToShow={1}   // Always one card on mobile
+        >
+          {testimonials.map((t, i) => {
+            const expanded = expandedList[i];
+            const feedback = t.feedback;
+            const firstLetter = t.name?.charAt(0)?.toUpperCase() || "U";
 
-              <p className="text-gray-300 italic mt-3 text-sm px-2">
-                “{expanded ? feedback : shortText}”
-              </p>
+            const shortText =
+              feedback.length > 120 ? feedback.slice(0, 120) + "..." : feedback;
 
-              {feedback.length > 120 && (
-                <button
-                  onClick={() => toggleExpandAt(i)}
-                  className="mt-2 text-cyan-400 text-sm hover:underline"
-                >
-                  {expanded ? "Read Less" : "Read More"}
-                </button>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </Slider>
+            return (
+              <div key={i} className="px-6">
+                <div className="bg-gray-800/60 p-6 rounded-2xl border border-gray-700
+                                hover:border-emerald-400 transition shadow-lg 
+                                flex flex-col items-center">
+
+                  {/* Avatar */}
+                  <div className="w-[70px] h-[70px] rounded-full bg-gradient-to-br 
+                                  from-emerald-400 via-cyan-400 to-blue-500 text-black flex 
+                                  items-center justify-center text-3xl font-bold mb-4">
+                    {firstLetter}
+                  </div>
+
+                  <h3 className="font-semibold text-lg capitalize">{t.name}</h3>
+                  <p className="text-gray-400 text-sm">{t.role || "User"}</p>
+
+                  <p className="text-gray-300 italic mt-3 text-sm px-2">
+                    “{expanded ? feedback : shortText}”
+                  </p>
+
+                  {feedback.length > 120 && (
+                    <button
+                      onClick={() => toggleExpandAt(i)}
+                      className="mt-2 text-cyan-400 text-sm hover:underline"
+                    >
+                      {expanded ? "See Less" : "See More"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </Slider>
+      </div>
+    </>
   )}
 </section>
+
 
       <Footer />
     </div>

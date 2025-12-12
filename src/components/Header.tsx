@@ -403,85 +403,87 @@ export default function Header() {
       </div>
 
       {/* MOBILE SIDEBAR */}
-      {mobileOpen && (
-        <>
-          <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-lg z-[140]"
-            onClick={() => setMobileOpen(false)}
-          />
+     {/* MOBILE SIDEBAR */}
+{mobileOpen && (
+  <>
+    <div
+      className="fixed inset-0 bg-black/70 backdrop-blur-lg z-[140]"
+      onClick={() => setMobileOpen(false)}
+    />
 
-          <aside className="fixed top-0 left-0 w-[78%] max-w-xs h-full bg-[#0d0d0e] border-r border-gray-800 p-6 z-[150] shadow-xl">
-            <div className="flex justify-between items-center mb-8">
-              <Image src="/logos/CodeCommunity.png" width={130} height={40} alt="logo" />
-              <button onClick={() => setMobileOpen(false)}>
-                <X className="text-gray-400 hover:text-white w-7 h-7 transition" />
-              </button>
+    <aside className="fixed top-0 left-0 w-[78%] max-w-xs h-full bg-[#0d0d0e] border-r border-gray-800 p-6 z-[150] shadow-xl">
+      <div className="flex justify-between items-center mb-8">
+        <Image src="/logos/CodeCommunity.png" width={130} height={40} alt="logo" />
+        <button onClick={() => setMobileOpen(false)}>
+          <X className="text-gray-400 hover:text-white w-7 h-7 transition" />
+        </button>
+      </div>
+
+      {/* USER INFO (always show if user exists, no loading restriction) */}
+      {user ? (
+        <>
+          <div className="flex items-center gap-4 bg-gray-900/60 border border-gray-700 p-4 rounded-2xl mb-8 shadow-sm">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 
+                            flex items-center justify-center text-black font-bold text-lg">
+              {user.name[0].toUpperCase()}
             </div>
 
-            {/* USER INFO */}
-            {isReady ? (
-              <>
-                <div className="flex items-center gap-4 bg-gray-900/60 border border-gray-700 p-4 rounded-2xl mb-8 shadow-sm">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 
-                                  flex items-center justify-center text-black font-bold text-lg">
-                    {user.name[0].toUpperCase()}
-                  </div>
-
-                  <div>
-                    <p className="text-white font-semibold text-base">{user.name}</p>
-                    <p className="text-gray-400 text-sm capitalize">{user.role}</p>
-                  </div>
-                </div>
-
-                <nav className="flex bg-gray-900 p-3 border border-gray-600 rounded-2xl flex-col gap-2 text-gray-300">
-                  {[
-                    { path: "/home", label: "Home" },
-                    { path: "/developers", label: "Developers" },
-                    { path: "/users", label: "Users" },
-                    { path: "/chat", label: "Chat" },
-                    { path: "/about", label: "About" },
-                    { path: "/contact", label: "Contact" },
-                    { path: "/profile", label: "Profile" },
-                    { path: "/dashboard", label: "Dashboard" },
-                  ].map((item) => (
-                    <Link
-                      key={item.path}
-                      href={item.path}
-                      onClick={() => setMobileOpen(false)}
-                      className="px-4 py-3 rounded-xl border border-gray-800 hover:border-emerald-500 text-sm font-medium transition flex items-center justify-between"
-                    >
-                      <span>{item.label}</span>
-                      <ChevronDown className="w-4 h-4 opacity-40 rotate-[-90deg]" />
-                    </Link>
-                  ))}
-
-                  <button
-                    onClick={async () => {
-                      setMobileOpen(false);
-                      await fetch(`${API_URL}/api/auth/logout`, {
-                        method: "POST",
-                        credentials: "include",
-                      });
-                      setUser(null);
-                      router.replace("/login");
-                    }}
-                    className="px-4 py-3 rounded-xl border border-red-500 text-red-500 hover:bg-red-900/20 mt-3 text-sm font-semibold flex items-center gap-2"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    Logout
-                  </button>
-                </nav>
-              </>
-            ) : (
-              <div className="flex flex-col gap-4">
-                <div className="w-full h-12 bg-gray-800/80 animate-pulse rounded-xl" />
-                <div className="w-full h-12 bg-gray-800/80 animate-pulse rounded-xl" />
-                <div className="w-full h-12 bg-gray-800/80 animate-pulse rounded-xl" />
-              </div>
-            )}
-          </aside>
+            <div>
+              <p className="text-white font-semibold text-base">{user.name}</p>
+              <p className="text-gray-400 text-sm capitalize">{user.role}</p>
+            </div>
+          </div>
         </>
+      ) : (
+        <div className="text-gray-400 text-center py-4">Not logged in</div>
       )}
+
+      {/* NAVIGATION (always visible) */}
+      <nav className="flex bg-gray-900 p-3 border border-gray-600 rounded-2xl flex-col gap-2 text-gray-300">
+        {[
+          { path: "/home", label: "Home" },
+          { path: "/developers", label: "Developers" },
+          { path: "/users", label: "Users" },
+          { path: "/chat", label: "Chat" },
+          { path: "/about", label: "About" },
+          { path: "/contact", label: "Contact" },
+          { path: "/profile", label: "Profile" },
+          { path: "/dashboard", label: "Dashboard" },
+        ].map((item) => (
+          <Link
+            key={item.path}
+            href={item.path}
+            onClick={() => setMobileOpen(false)}
+            className="px-4 py-3 rounded-xl border border-gray-800 hover:border-emerald-500 text-sm font-medium transition flex items-center justify-between"
+          >
+            <span>{item.label}</span>
+            <ChevronDown className="w-4 h-4 opacity-40 rotate-[-90deg]" />
+          </Link>
+        ))}
+
+        {/* LOGOUT BUTTON — NOW VISIBLE */}
+        {user && (
+          <button
+            onClick={async () => {
+              setMobileOpen(false);
+              await fetch(`${API_URL}/api/auth/logout`, {
+                method: "POST",
+                credentials: "include",
+              });
+              setUser(null);
+              router.replace("/login");
+            }}
+            className="px-4 py-3 rounded-xl border border-red-500 text-red-500 hover:bg-red-900/20 mt-3 text-sm font-semibold flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            Logout
+          </button>
+        )}
+      </nav>
+    </aside>
+  </>
+)}
+
     </header>
   );
 }
