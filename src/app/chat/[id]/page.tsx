@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { useChatGlobal } from "@/app/providers/ChatProvider";
-import ChatInboxPage from "../page"; // parent /chat/page
+import ChatInboxPage from "../page";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -21,7 +21,9 @@ type MessageType = {
 export default function ChatConversationPage() {
   const router = useRouter();
   const params = useParams();
-  const partnerId = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
+  const partnerId = Array.isArray(params?.id)
+    ? params.id[0]
+    : (params?.id as string);
 
   const { socket, socketReady, currentUser, ready } = useChatGlobal();
 
@@ -35,8 +37,36 @@ export default function ChatConversationPage() {
   const partnerRef = useRef<string | null>(partnerId);
 
   /* ---------------------------
+     Ask notification permission once
+  --------------------------- */
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  /* ---------------------------
+     Date label helper
+  --------------------------- */
+  const formatDateLabel = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(today.getDate() - 1);
+
+    if (date.toDateString() === today.toDateString()) return "Today";
+    if (date.toDateString() === yesterday.toDateString())
+      return "Yesterday";
+
+    return date.toLocaleDateString(undefined, {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
+  };
+
+  /* ---------------------------
      Defensive normalization
-     Accept many shapes from server
   --------------------------- */
   const asString = (v: any) => {
     if (v == null) return "";
@@ -44,8 +74,8 @@ export default function ChatConversationPage() {
     if (typeof v === "number") return String(v);
     if (v._id) return String(v._id);
     if (v.id) return String(v.id);
-    // some servers nest user: { _id: ... }
-    if (v.user && (v.user._id || v.user.id)) return String(v.user._id ?? v.user.id);
+    if (v.user && (v.user._id || v.user.id))
+      return String(v.user._id ?? v.user.id);
     return "";
   };
 
@@ -59,88 +89,53 @@ export default function ChatConversationPage() {
   };
 
   const normalizeMessage = (raw: any): MessageType => {
-    if (!raw) {
-      console.warn("normalizeMessage: got falsy raw", raw);
-      return {
-        _id: `tmp-${Date.now()}`,
-        sender: { _id: "", name: "" },
-        receiver: { _id: "", name: "" },
-        message: "",
-        createdAt: new Date().toISOString(),
-        tempId: null,
-      };
-    }
-
-    // createdAt normalization
-    let createdAtIso: string;
-    if (raw.createdAt && !isNaN(Date.parse(String(raw.createdAt)))) {
-      createdAtIso = new Date(String(raw.createdAt)).toISOString();
-    } else if (raw.createdAt instanceof Date) {
-      createdAtIso = raw.createdAt.toISOString();
-    } else {
-      // fallback: if server provides ts or missing, use now
-      createdAtIso = new Date().toISOString();
-    }
-
-    // normalize sender/receiver shapes defensively
-    const senderId = asString(raw.sender ?? raw.from ?? raw.senderId ?? raw.fromId);
-    const senderName = asName(raw.sender ?? raw.from);
-
-    const receiverId = asString(raw.receiver ?? raw.to ?? raw.receiverId ?? raw.toId);
-    const receiverName = asName(raw.receiver ?? raw.to);
-
-    const id = raw._id?.toString() ?? raw.id?.toString() ?? raw.tempId ?? `tmp-${Date.now()}`;
-
-    // final message text
-    const messageText = raw.message ?? raw.text ?? raw.body ?? "";
+    const createdAt =
+      raw?.createdAt && !isNaN(Date.parse(raw.createdAt))
+        ? new Date(raw.createdAt).toISOString()
+        : new Date().toISOString();
 
     return {
-      _id: id,
-      sender: { _id: senderId, name: senderName },
-      receiver: { _id: receiverId, name: receiverName },
-      message: messageText,
-      createdAt: createdAtIso,
-      tempId: raw.tempId ?? null,
+      _id: raw?._id?.toString() ?? raw?.tempId ?? `tmp-${Date.now()}`,
+      sender: {
+        _id: asString(raw?.sender ?? raw?.from),
+        name: asName(raw?.sender ?? raw?.from),
+      },
+      receiver: {
+        _id: asString(raw?.receiver ?? raw?.to),
+        name: asName(raw?.receiver ?? raw?.to),
+      },
+      message: raw?.message ?? raw?.text ?? "",
+      createdAt,
+      tempId: raw?.tempId ?? null,
     };
   };
 
   /* ---------------------------
-     Upsert: replace temp bubbles reliably,
-     dedupe by _id, keep chronological order
+     Upsert message
   --------------------------- */
-  const upsertMessage = (incomingRaw: any) => {
-    const incoming = normalizeMessage(incomingRaw);
+  const upsertMessage = (raw: any) => {
+    const incoming = normalizeMessage(raw);
 
     setMessages((prev) => {
-      // shallow copy
       const list = [...prev];
 
-      // 1) If server returns a message with tempId -> replace the optimistic bubble
       if (incoming.tempId) {
-        // find by tempId (optimistic id stored in _id previously)
-        const byTempIndex = list.findIndex((m) => m._id === incoming.tempId || m.tempId === incoming.tempId);
-        if (byTempIndex !== -1) {
-          // ensure we preserve server's createdAt and server _id
-          list[byTempIndex] = {
-            ...incoming,
-            _id: incoming._id ?? incoming.tempId,
-            tempId: null,
-          };
-          // no major resort (keeps user scroll stable), but ensure ordering if timestamps differ
-          list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        const i = list.findIndex(
+          (m) => m._id === incoming.tempId || m.tempId === incoming.tempId
+        );
+        if (i !== -1) {
+          list[i] = { ...incoming, tempId: null };
           return list;
         }
       }
 
-      // 2) If message already exists by server _id, ignore
-      if (incoming._id && list.some((m) => m._id === incoming._id)) {
-        return prev;
-      }
+      if (list.some((m) => m._id === incoming._id)) return prev;
 
-      // 3) Otherwise push and sort
-      list.push(incoming);
-      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      return list;
+      return [...list, incoming].sort(
+        (a, b) =>
+          new Date(a.createdAt).getTime() -
+          new Date(b.createdAt).getTime()
+      );
     });
   };
 
@@ -157,13 +152,22 @@ export default function ChatConversationPage() {
   useEffect(() => {
     if (!socket) return;
 
-    const onOnline = (id: string) => setOnline((prev) => [...new Set([...prev, id])]);
-    const onOffline = (id: string) => setOnline((prev) => prev.filter((x) => x !== id));
+    const onOnline = (id: string) =>
+      setOnline((p) => [...new Set([...p, id])]);
+    const onOffline = (id: string) =>
+      setOnline((p) => p.filter((x) => x !== id));
 
     socket.on("userOnline", onOnline);
     socket.on("userOffline", onOffline);
+socket.on("onlineUsers", (list: unknown) => {
+  if (Array.isArray(list)) {
+    setOnline(list.map(String));
+  } else {
+    setOnline([]);
+  }
+});
+
     socket.emit("getOnlineUsers");
-    socket.on("onlineUsers", (list: string[]) => setOnline(list ?? []));
 
     return () => {
       socket.off("userOnline", onOnline);
@@ -178,204 +182,242 @@ export default function ChatConversationPage() {
   useEffect(() => {
     if (!ready || !partnerId) return;
 
-    const load = async () => {
+    (async () => {
       setLoading(true);
       try {
-        const usersRes = await fetch(`${API_URL}/api/chat/users`, { credentials: "include" });
-        const users = await usersRes.json();
-        setPartner(users.find((u: UserMini) => String(u._id) === String(partnerId)) ?? null);
+        const users = await fetch(`${API_URL}/api/chat/users`, {
+          credentials: "include",
+        }).then((r) => r.json());
 
-        const msgRes = await fetch(`${API_URL}/api/chat/messages/${partnerId}`, { credentials: "include" });
-        const raw = await msgRes.json();
+        setPartner(
+          users.find((u: UserMini) => String(u._id) === String(partnerId)) ??
+            null
+        );
 
-        const normalized = (Array.isArray(raw) ? raw : []).map((m: any) => normalizeMessage(m));
-        normalized.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-        setMessages(normalized);
-      } catch (err) {
-        console.error("History load error:", err);
+        const raw = await fetch(
+          `${API_URL}/api/chat/messages/${partnerId}`,
+          { credentials: "include" }
+        ).then((r) => r.json());
+
+        setMessages(raw.map(normalizeMessage));
+      } catch (e) {
+        console.error(e);
       } finally {
         setLoading(false);
       }
-    };
-
-    load();
+    })();
   }, [ready, partnerId]);
 
   /* ---------------------------
-     Single receive handler
-     (logs unexpected shapes so you can fix server side)
+     Mark messages as read
+  --------------------------- */
+  useEffect(() => {
+    if (!partnerId) return;
+
+    fetch(`${API_URL}/api/chat/mark-read/${partnerId}`, {
+      method: "PUT",
+      credentials: "include",
+    });
+  }, [partnerId]);
+
+  /* ---------------------------
+     Receive socket messages
   --------------------------- */
   useEffect(() => {
     if (!socket) return;
 
     const onReceive = (raw: any) => {
-      try {
-        // debug: log raw payload if missing sender/receiver
-        if (!raw) {
-          console.warn("receiveMessage: empty payload", raw);
-          return;
-        }
-        // quick check for expected fields
-        if (!raw.sender && !raw.from && !raw.senderId) {
-          console.warn("receiveMessage: payload missing sender. raw:", raw);
-        }
-        if (!raw.receiver && !raw.to && !raw.receiverId) {
-          // some server messages may include only 'to' or 'receiverId'
-          console.warn("receiveMessage: payload missing receiver. raw:", raw);
-        }
+      const msg = normalizeMessage(raw);
+      if (
+        msg.sender._id !== partnerRef.current &&
+        msg.receiver._id !== partnerRef.current
+      )
+        return;
 
-        const msg = normalizeMessage(raw);
-        const pid = partnerRef.current;
-        if (!pid) return;
-
-        // if neither sender nor receiver matches current partner, ignore
-        if (msg.sender._id !== pid && msg.receiver._id !== pid) return;
-
-        upsertMessage(raw);
-      } catch (e) {
-        console.error("receiveMessage handler error", e);
-      }
+      upsertMessage(raw);
     };
 
     socket.on("receiveMessage", onReceive);
-
-    return () => {
-      socket.off("receiveMessage", onReceive);
-    };
+    return () => socket.off("receiveMessage", onReceive);
   }, [socket]);
 
   /* ---------------------------
-     Send message (optimistic)
+     Notification popup
   --------------------------- */
-  const handleSend = () => {
-    if (!input.trim()) return;
-    if (!socket || !socketReady || !currentUser) return;
+  useEffect(() => {
+    if (!socket) return;
 
-    const text = input.trim();
-    const tempId = `tmp-${Date.now()}`;
-
-    // emit to server. server should echo the saved message and include tempId in response
-    socket.emit("sendMessage", { to: partnerId, message: text, tempId });
-
-    // Build optimistic message with same normalized structure
-    const optimistic: MessageType = {
-      _id: tempId,
-      tempId,
-      sender: { _id: String(currentUser._id ?? currentUser.id ?? ""), name: currentUser.name ?? "" },
-      receiver: { _id: String(partnerId ?? ""), name: partner?.name ?? "" },
-      message: text,
-      createdAt: new Date().toISOString(),
+    const onNotify = (data: any) => {
+      if (String(data.from) === String(partnerRef.current)) return;
+      if (Notification.permission === "granted") {
+        new Notification(data.fromName || "New message", {
+          body: data.message,
+        });
+      }
     };
 
-    setMessages((prev) => {
-      const list = [...prev, optimistic];
-      list.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      return list;
+    socket.on("newMessageNotification", onNotify);
+    return () => socket.off("newMessageNotification", onNotify);
+  }, [socket]);
+
+  /* ---------------------------
+     Send message
+  --------------------------- */
+  const handleSend = () => {
+    if (!input.trim() || !socket || !socketReady || !currentUser) return;
+
+    const tempId = `tmp-${Date.now()}`;
+
+    socket.emit("sendMessage", {
+      to: partnerId,
+      message: input,
+      tempId,
     });
+
+    setMessages((p) => [
+      ...p,
+      {
+        _id: tempId,
+        tempId,
+        sender: { _id: String(currentUser._id), name: currentUser.name },
+        receiver: { _id: String(partnerId), name: partner?.name },
+        message: input,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
 
     setInput("");
   };
 
   /* ---------------------------
-     Auto-scroll when messages update
+     Auto scroll
   --------------------------- */
   useEffect(() => {
     const box = messagesRef.current;
     if (!box) return;
-    const t = setTimeout(() => {
+
+    const nearBottom =
+      box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+
+    if (nearBottom) {
       box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
-    }, 40);
-    return () => clearTimeout(t);
+    }
   }, [messages]);
 
-  const isPartnerOnline = online.includes(partnerId);
+  const isPartnerOnline = online.some(
+    (id) => String(id) === String(partnerId)
+  );
 
   if (!partnerId)
-    return <div className="h-screen flex items-center justify-center text-red-400">Invalid chat link</div>;
+    return (
+      <div className="h-screen flex items-center justify-center text-red-400">
+        Invalid chat link
+      </div>
+    );
 
-return (
-  <div className="h-screen  bg-black text-white flex">
+  return (
+    <div className="h-screen bg-black text-white flex">
+      {/* SIDEBAR (DESKTOP) */}
+      <div className="hidden md:flex w-[380px] border-r border-gray-800">
+        <ChatInboxPage />
+      </div>
 
-    {/* SIDEBAR — only on DESKTOP (WhatsApp-style) */}
-    <div className="hidden md:flex w-[380px] border-r border-gray-800 bg-gray-900">
-      <ChatInboxPage />
-    </div>
+      {/* CHAT WINDOW */}
+      <div className="flex-1 flex flex-col">
+        <header className="flex items-center gap-3 p-4 border-b border-gray-800 bg-gray-900">
+          <button
+            className="md:hidden p-2"
+            onClick={() => router.push("/chat")}
+          >
+            <ArrowLeft />
+          </button>
 
-    {/* CHAT WINDOW */}
-    <div className="flex-1  pt-15 flex flex-col bg-black">
+          <div className="w-10 h-10 rounded-full bg-emerald-400 text-black flex items-center justify-center font-bold">
+            {partner?.name?.[0]?.toUpperCase() ?? "U"}
+          </div>
 
-      {/* HEADER */}
-      <header className="flex items-center gap-3 p-4 border-b border-gray-800 bg-gray-900">
-        {/* Back button only on mobile */}
-        <button
-          className="md:hidden p-2 rounded hover:bg-gray-800"
-          onClick={() => router.push("/chat")}
+          <div>
+            <div className="font-semibold">{partner?.name}</div>
+            <div className="text-xs text-gray-400">
+              {isPartnerOnline ? "Online" : "Offline"}
+            </div>
+          </div>
+        </header>
+
+        <div
+          ref={messagesRef}
+          className="flex-1 overflow-y-auto p-4 bg-gray-950"
         >
-          <ArrowLeft className="w-5 h-5" />
-        </button>
+          {loading ? (
+            <p className="text-center text-gray-400">Loading…</p>
+          ) : (
+            messages.map((m, i) => {
+              const isMe =
+                String(m.sender._id) ===
+                String(currentUser?._id ?? currentUser?.id);
 
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 flex items-center justify-center text-black font-bold">
-          {partner?.name?.[0]?.toUpperCase() ?? "U"}
-        </div>
+              const showDate =
+                i === 0 ||
+                new Date(messages[i - 1].createdAt).toDateString() !==
+                  new Date(m.createdAt).toDateString();
 
-        <div>
-          <div className="font-semibold">{partner?.name ?? "User"}</div>
-          <div className="text-xs text-gray-400">{isPartnerOnline ? "Online" : "Offline"}</div>
-        </div>
-      </header>
+              return (
+                <div key={m._id}>
+                  {showDate && (
+                    <div className="flex justify-center my-4">
+                      <span className="px-3 py-1 text-xs rounded bg-gray-800">
+                        {formatDateLabel(m.createdAt)}
+                      </span>
+                    </div>
+                  )}
 
-      {/* MESSAGES */}
-      <div ref={messagesRef} className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-950">
-        {loading ? (
-          <div className="text-center text-gray-400">Loading…</div>
-        ) : messages.length === 0 ? (
-          <div className="text-center text-gray-500">Start the conversation</div>
-        ) : (
-          messages.map((m) => {
-            const isMe = String(m.sender._id) === String(currentUser?._id ?? currentUser?.id);
-            return (
-              <div key={m._id} className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`px-4 py-2 rounded-2xl max-w-[75%] ${
-                    isMe
-                      ? "bg-gradient-to-r from-emerald-500 to-cyan-500 text-black"
-                      : "bg-gray-800 text-gray-200"
-                  }`}
-                >
-                  <div className="text-sm">{m.message}</div>
-                  <div className="text-[10px] text-gray-300 mt-1 text-right">
-                    {new Date(m.createdAt).toLocaleTimeString([], {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                  <div
+                    className={`flex ${
+                      isMe ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`px-4 py-2 rounded-2xl max-w-[75%] ${
+                        isMe
+                          ? "bg-emerald-500 text-black"
+                          : "bg-gray-800 text-white"
+                      }`}
+                    >
+                      <div className="text-sm">{m.message}</div>
+                      <div className="text-[10px] text-right mt-1 opacity-70">
+                        {new Date(m.createdAt).toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+              );
+            })
+          )}
+        </div>
 
-      {/* INPUT */}
-      <div className="p-4 border-t border-gray-800 bg-gray-900 flex items-center gap-3">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSend()}
-          placeholder={socketReady ? "Write a message…" : "Connecting…"}
-          disabled={!socketReady}
-          className="flex-1 px-4 py-2 rounded-full bg-gray-800 border border-gray-700 outline-none"
-        />
-        <button
-          onClick={handleSend}
-          disabled={!socketReady}
-          className="px-4 py-2 rounded-full bg-emerald-500 text-black font-semibold"
-        >
-          Send
-        </button>
+        <div className="p-4 border-t border-gray-800 bg-gray-900 flex gap-3">
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleSend()}
+            className="flex-1 px-4 py-2 rounded-full bg-gray-800 outline-none"
+            placeholder={
+              socketReady ? "Write a message…" : "Connecting…"
+            }
+            disabled={!socketReady}
+          />
+          <button
+            onClick={handleSend}
+            disabled={!socketReady}
+            className="px-4 py-2 rounded-full bg-emerald-500 text-black font-semibold"
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
-  </div>
-);
-
+  );
 }
