@@ -8,20 +8,27 @@ export default function LoaderScene() {
   const ref = useRef<any>(null);
 
   const particles = useMemo(() => {
-    const count = 2000;
+    const count = 1600; // slightly reduced for smoothness
     const positions = new Float32Array(count * 3);
 
-    for (let i = 0; i < count * 3; i++) {
-      positions[i] = (Math.random() - 0.5) * 6;
+    for (let i = 0; i < count; i++) {
+      positions[i * 3] = (Math.random() - 0.5) * 6;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 6;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 6;
     }
 
     return positions;
   }, []);
 
-  useFrame((_, delta) => {
-    if (ref.current) {
-      ref.current.rotation.y += delta * 0.08;
-    }
+  useFrame((state, delta) => {
+    if (!ref.current) return;
+
+    // smooth ambient motion
+    ref.current.rotation.y += delta * 0.035;
+    ref.current.rotation.x += delta * 0.01;
+
+    // subtle breathing movement
+    ref.current.position.y = Math.sin(state.clock.elapsedTime * 0.6) * 0.08;
   });
 
   return (
@@ -29,9 +36,10 @@ export default function LoaderScene() {
       <PointMaterial
         transparent
         color="#38bdf8"
-        size={0.02}
+        size={0.018}
         sizeAttenuation
         depthWrite={false}
+        opacity={0.85}
       />
     </Points>
   );
