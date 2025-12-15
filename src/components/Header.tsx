@@ -48,9 +48,52 @@ export default function Header() {
 
   /* --------------------------------------------------------
      Load Notifications
-/* --------------------------------------------------------
-   Load Notifications
+/* --------------------------------------------------------/* --------------------------------------------------------
+   Ask browser notification permission ONCE
 -------------------------------------------------------- */
+useEffect(() => {
+  if ("Notification" in window && Notification.permission !== "granted") {
+    Notification.requestPermission();
+  }
+}, []);
+
+ 
+/* --------------------------------------------------------
+   CHAT MESSAGE → SYSTEM NOTIFICATION
+-------------------------------------------------------- */
+useEffect(() => {
+  if (loading) return;
+  if (!user) return;
+
+  const socket = getSocket(user.id);
+
+  const onChatMessage = (data: {
+    from: string;
+    fromName?: string;
+    message?: string;
+  }) => {
+    // 🔕 Do NOT show popup if user is already on chat page
+    if (pathname.startsWith("/chat")) return;
+
+    // 🔔 Browser notification
+    if (!("Notification" in window)) return;
+    if (Notification.permission !== "granted") return;
+
+    new Notification(data.fromName || "New message", {
+      body: data.message || "You received a new message",
+      icon: "/logos/CodeCommunity.png",
+    });
+  };
+
+  socket.on("newMessageNotification", onChatMessage);
+
+  return () => {
+    socket.off("newMessageNotification", onChatMessage);
+  };
+}, [user, loading, pathname]);
+
+
+
 const loadNotifs = useCallback(async () => {
   if (!user) return;
 

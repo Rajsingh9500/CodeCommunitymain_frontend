@@ -8,22 +8,23 @@ import ChatInboxPage from "../page";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
-type UserMini = { _id: string; name?: string; email?: string };
+/* ---------------- TYPES ---------------- */
+type UserMini = { _id: string; name?: string };
 type MessageType = {
   _id: string;
+  tempId?: string | null;
   sender: { _id: string; name?: string };
   receiver: { _id: string; name?: string };
   message: string;
   createdAt: string;
-  tempId?: string | null;
 };
 
 export default function ChatConversationPage() {
   const router = useRouter();
   const params = useParams();
-  const partnerId = Array.isArray(params?.id)
-    ? params.id[0]
-    : (params?.id as string);
+  const partnerId = String(
+    Array.isArray(params?.id) ? params.id[0] : params?.id
+  );
 
   const { socket, socketReady, currentUser, ready } = useChatGlobal();
 
@@ -34,183 +35,74 @@ export default function ChatConversationPage() {
   const [input, setInput] = useState("");
 
   const messagesRef = useRef<HTMLDivElement | null>(null);
-  const partnerRef = useRef<string | null>(partnerId);
+  const partnerRef = useRef(partnerId);
 
-  /* ---------------------------
-     Ask notification permission once
-  --------------------------- */
+  const myId = String(currentUser?._id ?? currentUser?.id ?? "");
+
+  /* ---------------- ASK NOTIFICATION PERMISSION ONCE ---------------- */
   useEffect(() => {
     if ("Notification" in window && Notification.permission !== "granted") {
       Notification.requestPermission();
     }
   }, []);
 
-  /* ---------------------------
-     Date label helper
-  --------------------------- */
+  /* ---------------- DATE LABEL ---------------- */
   const formatDateLabel = (dateStr: string) => {
-    const date = new Date(dateStr);
+    const d = new Date(dateStr);
     const today = new Date();
     const yesterday = new Date();
     yesterday.setDate(today.getDate() - 1);
 
-    if (date.toDateString() === today.toDateString()) return "Today";
-    if (date.toDateString() === yesterday.toDateString())
-      return "Yesterday";
+    if (d.toDateString() === today.toDateString()) return "Today";
+    if (d.toDateString() === yesterday.toDateString()) return "Yesterday";
 
-    return date.toLocaleDateString(undefined, {
+    return d.toLocaleDateString(undefined, {
       day: "numeric",
       month: "long",
       year: "numeric",
     });
   };
 
-  /* ---------------------------
-     Defensive normalization
-  --------------------------- */
-  const asString = (v: any) => {
-    if (v == null) return "";
-    if (typeof v === "string") return v;
-    if (typeof v === "number") return String(v);
-    if (v._id) return String(v._id);
-    if (v.id) return String(v.id);
-    if (v.user && (v.user._id || v.user.id))
-      return String(v.user._id ?? v.user.id);
-    return "";
-  };
+  /* ---------------- NORMALIZE MESSAGE ---------------- */
+  const normalize = (raw: any): MessageType => ({
+    _id: String(raw._id ?? raw.tempId),
+    tempId: raw.tempId ?? null,
+    sender: {
+      _id: String(raw.sender?._id ?? raw.sender),
+      name: raw.sender?.name,
+    },
+    receiver: {
+      _id: String(raw.receiver?._id ?? raw.receiver),
+      name: raw.receiver?.name,
+    },
+    message: raw.message,
+    createdAt: new Date(raw.createdAt).toISOString(),
+  });
 
-  const asName = (v: any) => {
-    if (!v) return "";
-    if (typeof v === "string") return "";
-    if (v.name) return String(v.name);
-    if (v.username) return String(v.username);
-    if (v.user && v.user.name) return String(v.user.name);
-    return "";
-  };
-
-  const normalizeMessage = (raw: any): MessageType => {
-    const createdAt =
-      raw?.createdAt && !isNaN(Date.parse(raw.createdAt))
-        ? new Date(raw.createdAt).toISOString()
-        : new Date().toISOString();
-
-    return {
-      _id: raw?._id?.toString() ?? raw?.tempId ?? `tmp-${Date.now()}`,
-      sender: {
-        _id: asString(raw?.sender ?? raw?.from),
-        name: asName(raw?.sender ?? raw?.from),
-      },
-      receiver: {
-        _id: asString(raw?.receiver ?? raw?.to),
-        name: asName(raw?.receiver ?? raw?.to),
-      },
-      message: raw?.message ?? raw?.text ?? "",
-      createdAt,
-      tempId: raw?.tempId ?? null,
-    };
-  };
-
-  /* ---------------------------
-     Upsert message
-  --------------------------- */
-  const upsertMessage = (raw: any) => {
-    const incoming = normalizeMessage(raw);
-
-    setMessages((prev) => {
-      const list = [...prev];
-
-      if (incoming.tempId) {
-        const i = list.findIndex(
-          (m) => m._id === incoming.tempId || m.tempId === incoming.tempId
-        );
-        if (i !== -1) {
-          list[i] = { ...incoming, tempId: null };
-          return list;
-        }
-      }
-
-      if (list.some((m) => m._id === incoming._id)) return prev;
-
-      return [...list, incoming].sort(
-        (a, b) =>
-          new Date(a.createdAt).getTime() -
-          new Date(b.createdAt).getTime()
-      );
-    });
-  };
-
-  /* ---------------------------
-     partnerRef sync
-  --------------------------- */
-  useEffect(() => {
-    partnerRef.current = partnerId;
-  }, [partnerId]);
-
-  /* ---------------------------
-     Online socket events
-  --------------------------- */
-  useEffect(() => {
-    if (!socket) return;
-
-    const onOnline = (id: string) =>
-      setOnline((p) => [...new Set([...p, id])]);
-    const onOffline = (id: string) =>
-      setOnline((p) => p.filter((x) => x !== id));
-
-    socket.on("userOnline", onOnline);
-    socket.on("userOffline", onOffline);
-socket.on("onlineUsers", (list: unknown) => {
-  if (Array.isArray(list)) {
-    setOnline(list.map(String));
-  } else {
-    setOnline([]);
-  }
-});
-
-    socket.emit("getOnlineUsers");
-
-    return () => {
-      socket.off("userOnline", onOnline);
-      socket.off("userOffline", onOffline);
-      socket.off("onlineUsers");
-    };
-  }, [socket]);
-
-  /* ---------------------------
-     Load partner + history
-  --------------------------- */
+  /* ---------------- LOAD PARTNER + HISTORY ---------------- */
   useEffect(() => {
     if (!ready || !partnerId) return;
 
     (async () => {
       setLoading(true);
-      try {
-        const users = await fetch(`${API_URL}/api/chat/users`, {
-          credentials: "include",
-        }).then((r) => r.json());
 
-        setPartner(
-          users.find((u: UserMini) => String(u._id) === String(partnerId)) ??
-            null
-        );
+      const users = await fetch(`${API_URL}/api/chat/users`, {
+        credentials: "include",
+      }).then((r) => r.json());
 
-        const raw = await fetch(
-          `${API_URL}/api/chat/messages/${partnerId}`,
-          { credentials: "include" }
-        ).then((r) => r.json());
+      setPartner(users.find((u: UserMini) => String(u._id) === partnerId));
 
-        setMessages(raw.map(normalizeMessage));
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoading(false);
-      }
+      const msgs = await fetch(
+        `${API_URL}/api/chat/messages/${partnerId}`,
+        { credentials: "include" }
+      ).then((r) => r.json());
+
+      setMessages(msgs.map(normalize));
+      setLoading(false);
     })();
   }, [ready, partnerId]);
 
-  /* ---------------------------
-     Mark messages as read
-  --------------------------- */
+  /* ---------------- MARK MESSAGES AS READ ---------------- */
   useEffect(() => {
     if (!partnerId) return;
 
@@ -220,51 +112,67 @@ socket.on("onlineUsers", (list: unknown) => {
     });
   }, [partnerId]);
 
-  /* ---------------------------
-     Receive socket messages
-  --------------------------- */
+  /* ---------------- ONLINE / OFFLINE ---------------- */
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleOnline = (id: string) =>
+      setOnline((p) => [...new Set([...p, String(id)])]);
+
+    const handleOffline = (id: string) =>
+      setOnline((p) => p.filter((x) => x !== String(id)));
+
+    socket.on("userOnline", handleOnline);
+    socket.on("userOffline", handleOffline);
+    socket.on("onlineUsers", (list: any) =>
+      Array.isArray(list) ? setOnline(list.map(String)) : setOnline([])
+    );
+
+    socket.emit("getOnlineUsers");
+
+    return () => {
+      socket.off("userOnline", handleOnline);
+      socket.off("userOffline", handleOffline);
+      socket.off("onlineUsers");
+    };
+  }, [socket]);
+
+  /* ---------------- RECEIVE MESSAGE ---------------- */
   useEffect(() => {
     if (!socket) return;
 
     const onReceive = (raw: any) => {
-      const msg = normalizeMessage(raw);
+      const msg = normalize(raw);
+
       if (
         msg.sender._id !== partnerRef.current &&
         msg.receiver._id !== partnerRef.current
       )
         return;
 
-      upsertMessage(raw);
+      setMessages((prev) => {
+        // Replace optimistic message
+        if (msg.tempId) {
+          const i = prev.findIndex((m) => m._id === msg.tempId);
+          if (i !== -1) {
+            const copy = [...prev];
+            copy[i] = { ...msg, tempId: null };
+            return copy;
+          }
+        }
+
+        if (prev.some((m) => m._id === msg._id)) return prev;
+        return [...prev, msg];
+      });
     };
 
     socket.on("receiveMessage", onReceive);
     return () => socket.off("receiveMessage", onReceive);
   }, [socket]);
 
-  /* ---------------------------
-     Notification popup
-  --------------------------- */
-  useEffect(() => {
-    if (!socket) return;
-
-    const onNotify = (data: any) => {
-      if (String(data.from) === String(partnerRef.current)) return;
-      if (Notification.permission === "granted") {
-        new Notification(data.fromName || "New message", {
-          body: data.message,
-        });
-      }
-    };
-
-    socket.on("newMessageNotification", onNotify);
-    return () => socket.off("newMessageNotification", onNotify);
-  }, [socket]);
-
-  /* ---------------------------
-     Send message
-  --------------------------- */
+  /* ---------------- SEND MESSAGE (FIXED) ---------------- */
   const handleSend = () => {
-    if (!input.trim() || !socket || !socketReady || !currentUser) return;
+    if (!input.trim() || !socket || !socketReady) return;
 
     const tempId = `tmp-${Date.now()}`;
 
@@ -279,8 +187,8 @@ socket.on("onlineUsers", (list: unknown) => {
       {
         _id: tempId,
         tempId,
-        sender: { _id: String(currentUser._id), name: currentUser.name },
-        receiver: { _id: String(partnerId), name: partner?.name },
+        sender: { _id: myId, name: currentUser?.name },
+        receiver: { _id: partnerId, name: partner?.name },
         message: input,
         createdAt: new Date().toISOString(),
       },
@@ -289,9 +197,7 @@ socket.on("onlineUsers", (list: unknown) => {
     setInput("");
   };
 
-  /* ---------------------------
-     Auto scroll
-  --------------------------- */
+  /* ---------------- SMART AUTO SCROLL ---------------- */
   useEffect(() => {
     const box = messagesRef.current;
     if (!box) return;
@@ -304,9 +210,7 @@ socket.on("onlineUsers", (list: unknown) => {
     }
   }, [messages]);
 
-  const isPartnerOnline = online.some(
-    (id) => String(id) === String(partnerId)
-  );
+  const isPartnerOnline = online.includes(partnerId);
 
   if (!partnerId)
     return (
@@ -315,14 +219,15 @@ socket.on("onlineUsers", (list: unknown) => {
       </div>
     );
 
+  /* ---------------- UI ---------------- */
   return (
     <div className="h-screen bg-black text-white flex">
-      {/* SIDEBAR (DESKTOP) */}
+      {/* SIDEBAR */}
       <div className="hidden md:flex w-[380px] border-r border-gray-800">
         <ChatInboxPage />
       </div>
 
-      {/* CHAT WINDOW */}
+      {/* CHAT */}
       <div className="flex-1 flex flex-col">
         <header className="flex items-center gap-3 p-4 border-b border-gray-800 bg-gray-900">
           <button
@@ -352,9 +257,7 @@ socket.on("onlineUsers", (list: unknown) => {
             <p className="text-center text-gray-400">Loading…</p>
           ) : (
             messages.map((m, i) => {
-              const isMe =
-                String(m.sender._id) ===
-                String(currentUser?._id ?? currentUser?.id);
+              const isMe = m.sender._id === myId;
 
               const showDate =
                 i === 0 ||
@@ -362,20 +265,16 @@ socket.on("onlineUsers", (list: unknown) => {
                   new Date(m.createdAt).toDateString();
 
               return (
-                <div key={m._id}>
+                <div key={m._id} className="mb-4">
                   {showDate && (
-                    <div className="flex justify-center my-4">
+                    <div className="flex justify-center mb-3">
                       <span className="px-3 py-1 text-xs rounded bg-gray-800">
                         {formatDateLabel(m.createdAt)}
                       </span>
                     </div>
                   )}
 
-                  <div
-                    className={`flex ${
-                      isMe ? "justify-end" : "justify-start"
-                    }`}
-                  >
+                  <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
                     <div
                       className={`px-4 py-2 rounded-2xl max-w-[75%] ${
                         isMe
@@ -398,15 +297,14 @@ socket.on("onlineUsers", (list: unknown) => {
           )}
         </div>
 
+        {/* INPUT */}
         <div className="p-4 border-t border-gray-800 bg-gray-900 flex gap-3">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSend()}
             className="flex-1 px-4 py-2 rounded-full bg-gray-800 outline-none"
-            placeholder={
-              socketReady ? "Write a message…" : "Connecting…"
-            }
+            placeholder={socketReady ? "Write a message…" : "Connecting…"}
             disabled={!socketReady}
           />
           <button
