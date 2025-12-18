@@ -230,7 +230,7 @@ export default function ChatConversationPage() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-[100dvh] bg-black text-white flex">
+    <div className="min-h-[100dvh] pt-16 bg-black text-white flex">
       {/* SIDEBAR */}
       <div className="hidden md:flex w-[380px] border-r border-gray-800">
         <ChatInboxPage />

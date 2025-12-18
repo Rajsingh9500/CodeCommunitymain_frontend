@@ -121,7 +121,7 @@ export default function ChatInboxPage() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="flex h-full bg-black text-white">
+    <div className="flex h-full pt-16 bg-black text-white">
       <aside className="w-full md:w-96 border-r border-gray-800 flex flex-col">
 
         {/* HEADER */}
