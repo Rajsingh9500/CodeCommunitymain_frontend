@@ -230,14 +230,14 @@ export default function ChatConversationPage() {
 
   /* ---------------- UI ---------------- */
   return (
-    <div className="min-h-[100dvh] pt-16 bg-black text-white flex">
+    <div className="min-h-[100dvh] bg-black text-white flex">
       {/* SIDEBAR */}
       <div className="hidden md:flex w-[380px] border-r border-gray-800">
         <ChatInboxPage />
       </div>
 
       {/* CHAT */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 pt-20 flex flex-col">
         {/* HEADER */}
         <header className="flex items-center gap-3 px-4 py-3 pt-safe border-b border-gray-800 bg-gray-900">
           <button
