@@ -10,6 +10,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 /* ---------------- TYPES ---------------- */
 type UserMini = { _id: string; name?: string };
+
 type MessageType = {
   _id: string;
   tempId?: string | null;
@@ -22,11 +23,13 @@ type MessageType = {
 export default function ChatConversationPage() {
   const router = useRouter();
   const params = useParams();
+
   const partnerId = String(
     Array.isArray(params?.id) ? params.id[0] : params?.id
   );
 
   const { socket, socketReady, currentUser, ready } = useChatGlobal();
+  const myId = String(currentUser?._id ?? currentUser?.id ?? "");
 
   const [partner, setPartner] = useState<UserMini | null>(null);
   const [messages, setMessages] = useState<MessageType[]>([]);
@@ -37,14 +40,18 @@ export default function ChatConversationPage() {
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const partnerRef = useRef(partnerId);
 
-  const myId = String(currentUser?._id ?? currentUser?.id ?? "");
-
-  /* ---------------- ASK NOTIFICATION PERMISSION ONCE ---------------- */
+  /* ---------------- NOTIFICATION PERMISSION ---------------- */
   useEffect(() => {
-    if ("Notification" in window && Notification.permission !== "granted") {
+    if ("Notification" in window && Notification.permission === "default") {
       Notification.requestPermission();
     }
   }, []);
+
+  /* ---------------- SAFE DATE ---------------- */
+  const safeISO = (value?: any) => {
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
+  };
 
   /* ---------------- DATE LABEL ---------------- */
   const formatDateLabel = (dateStr: string) => {
@@ -76,7 +83,7 @@ export default function ChatConversationPage() {
       name: raw.receiver?.name,
     },
     message: raw.message,
-    createdAt: new Date(raw.createdAt).toISOString(),
+    createdAt: safeISO(raw.createdAt),
   });
 
   /* ---------------- LOAD PARTNER + HISTORY ---------------- */
@@ -102,28 +109,28 @@ export default function ChatConversationPage() {
     })();
   }, [ready, partnerId]);
 
-  /* ---------------- MARK MESSAGES AS READ ---------------- */
+  /* ---------------- MARK READ (NO SELF BUG) ---------------- */
   useEffect(() => {
-    if (!partnerId) return;
+    if (!partnerId || partnerId === myId) return;
 
     fetch(`${API_URL}/api/chat/mark-read/${partnerId}`, {
       method: "PUT",
       credentials: "include",
     });
-  }, [partnerId]);
+  }, [partnerId, myId]);
 
-  /* ---------------- ONLINE / OFFLINE ---------------- */
+  /* ---------------- ONLINE STATUS ---------------- */
   useEffect(() => {
     if (!socket) return;
 
-    const handleOnline = (id: string) =>
-      setOnline((p) => [...new Set([...p, String(id)])]);
+    const onOnline = (id: string) =>
+      setOnline((p) => (p.includes(id) ? p : [...p, String(id)]));
 
-    const handleOffline = (id: string) =>
+    const onOffline = (id: string) =>
       setOnline((p) => p.filter((x) => x !== String(id)));
 
-    socket.on("userOnline", handleOnline);
-    socket.on("userOffline", handleOffline);
+    socket.on("userOnline", onOnline);
+    socket.on("userOffline", onOffline);
     socket.on("onlineUsers", (list: any) =>
       Array.isArray(list) ? setOnline(list.map(String)) : setOnline([])
     );
@@ -131,18 +138,28 @@ export default function ChatConversationPage() {
     socket.emit("getOnlineUsers");
 
     return () => {
-      socket.off("userOnline", handleOnline);
-      socket.off("userOffline", handleOffline);
+      socket.off("userOnline", onOnline);
+      socket.off("userOffline", onOffline);
       socket.off("onlineUsers");
     };
   }, [socket]);
 
-  /* ---------------- RECEIVE MESSAGE ---------------- */
+  /* ---------------- RECEIVE MESSAGE + NOTIFICATION ---------------- */
   useEffect(() => {
     if (!socket) return;
 
     const onReceive = (raw: any) => {
       const msg = normalize(raw);
+
+      if (
+        Notification.permission === "granted" &&
+        msg.sender._id !== myId &&
+        document.hidden
+      ) {
+        new Notification(msg.sender.name || "New message", {
+          body: msg.message,
+        });
+      }
 
       if (
         msg.sender._id !== partnerRef.current &&
@@ -151,7 +168,6 @@ export default function ChatConversationPage() {
         return;
 
       setMessages((prev) => {
-        // Replace optimistic message
         if (msg.tempId) {
           const i = prev.findIndex((m) => m._id === msg.tempId);
           if (i !== -1) {
@@ -168,9 +184,9 @@ export default function ChatConversationPage() {
 
     socket.on("receiveMessage", onReceive);
     return () => socket.off("receiveMessage", onReceive);
-  }, [socket]);
+  }, [socket, myId]);
 
-  /* ---------------- SEND MESSAGE (FIXED) ---------------- */
+  /* ---------------- SEND MESSAGE ---------------- */
   const handleSend = () => {
     if (!input.trim() || !socket || !socketReady) return;
 
@@ -197,7 +213,7 @@ export default function ChatConversationPage() {
     setInput("");
   };
 
-  /* ---------------- SMART AUTO SCROLL ---------------- */
+  /* ---------------- AUTO SCROLL ---------------- */
   useEffect(() => {
     const box = messagesRef.current;
     if (!box) return;
@@ -212,16 +228,9 @@ export default function ChatConversationPage() {
 
   const isPartnerOnline = online.includes(partnerId);
 
-  if (!partnerId)
-    return (
-      <div className="h-screen flex items-center justify-center text-red-400">
-        Invalid chat link
-      </div>
-    );
-
   /* ---------------- UI ---------------- */
   return (
-    <div className="h-screen bg-black text-white flex">
+    <div className="min-h-[100dvh] bg-black text-white flex">
       {/* SIDEBAR */}
       <div className="hidden md:flex w-[380px] border-r border-gray-800">
         <ChatInboxPage />
@@ -229,7 +238,8 @@ export default function ChatConversationPage() {
 
       {/* CHAT */}
       <div className="flex-1 flex flex-col">
-        <header className="flex items-center gap-3 p-4 border-b border-gray-800 bg-gray-900">
+        {/* HEADER */}
+        <header className="flex items-center gap-3 px-4 py-3 pt-safe border-b border-gray-800 bg-gray-900">
           <button
             className="md:hidden p-2"
             onClick={() => router.push("/chat")}
@@ -241,17 +251,18 @@ export default function ChatConversationPage() {
             {partner?.name?.[0]?.toUpperCase() ?? "U"}
           </div>
 
-          <div>
-            <div className="font-semibold">{partner?.name}</div>
+          <div className="min-w-0">
+            <div className="font-semibold truncate">{partner?.name}</div>
             <div className="text-xs text-gray-400">
               {isPartnerOnline ? "Online" : "Offline"}
             </div>
           </div>
         </header>
 
+        {/* MESSAGES */}
         <div
           ref={messagesRef}
-          className="flex-1 overflow-y-auto p-4 bg-gray-950"
+          className="flex-1 overflow-y-auto p-4 pb-24 bg-gray-950"
         >
           {loading ? (
             <p className="text-center text-gray-400">Loading…</p>
@@ -274,7 +285,11 @@ export default function ChatConversationPage() {
                     </div>
                   )}
 
-                  <div className={`flex ${isMe ? "justify-end" : "justify-start"}`}>
+                  <div
+                    className={`flex ${
+                      isMe ? "justify-end" : "justify-start"
+                    }`}
+                  >
                     <div
                       className={`px-4 py-2 rounded-2xl max-w-[75%] ${
                         isMe
@@ -298,7 +313,7 @@ export default function ChatConversationPage() {
         </div>
 
         {/* INPUT */}
-        <div className="p-4 border-t border-gray-800 bg-gray-900 flex gap-3">
+        <div className="sticky bottom-0 p-4 border-t border-gray-800 bg-gray-900 flex gap-3">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
